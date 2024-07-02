@@ -61,6 +61,7 @@ pub fn compute_flow(
         &mut adjacencies,
         &mut used_edges,
         max_distance,
+        requested_flow
     );
     call_context.log_message(format!("Max flow: {}", flow.to_decimal()).as_str());
 
@@ -89,6 +90,7 @@ fn compute_max_flow(
     adjacencies: &mut Adjacencies,
     used_edges: &mut HashMap<Node, HashMap<Node, U256>>,
     max_distance: Option<u64>,
+    requested_flow: U256
 ) -> U256 {
     let mut flow = U256::default();
     loop {
@@ -97,6 +99,9 @@ fn compute_max_flow(
             break;
         }
         flow += new_flow;
+        if flow >= requested_flow {
+            break;
+        }
         for window in parents.windows(2) {
             if let [node, prev] = window {
                 adjacencies.adjust_capacity(prev, node, -new_flow);
