@@ -1,5 +1,6 @@
 use crate::safe_db::edge_db_dispenser::{EdgeDBVersion, EdgeDbDispenser};
 use json::JsonValue;
+use log::{info};
 use std::default::Default;
 use std::fmt;
 use std::fmt::{Display, Formatter};
@@ -58,14 +59,14 @@ impl CallContext {
         let suffix_str = suffix.unwrap_or("");
 
         if self.client_ip.is_empty() && self.request_id.is_null() && self.rpc_function.is_empty() {
-            println!("{}{}", prefix, suffix_str);
+            info!("{}{}", prefix, suffix_str);
             return;
         }
 
         let thread_id_string = format!("{:?}", std::thread::current().id());
         let version_number = self.version.as_ref().map(|v| v.version_number).unwrap_or(0);
 
-        println!(
+        info!(
             "{} {} [{}] [{}] [{}] [{}] [{}] {}",
             prefix,
             timestamp,
