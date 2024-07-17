@@ -8,7 +8,7 @@ use tiny_http::{Server, Response};
 
 use crate::safe_db::edge_db_dispenser::EdgeDbDispenser;
 
-pub fn start_server(listen_at: &str, queue_size: usize, threads: u64) {
+pub fn start_server(listen_at: &str, health_listen_at: String, queue_size: usize, threads: u64) {
     println!(
         "Starting pathfinder. Listening at {} with {} threads and queue size {}.",
         listen_at, threads, queue_size
@@ -48,9 +48,10 @@ pub fn start_server(listen_at: &str, queue_size: usize, threads: u64) {
     // Create a separate thread for the health check server
     let health_check_is_full = Arc::clone(&is_full);
     let health_check_pending_requests = Arc::clone(&pending_requests);
+    let health_listen_at_clone = health_listen_at.clone();
     thread::spawn(move || {
         // Health check server listening on port 8080
-        let health_server = Server::http("0.0.0.0:8080").expect("Could not create health check server.");
+        let health_server = Server::http(health_listen_at_clone).expect("Could not create health check server.");
         for request in health_server.incoming_requests() {
             if request.url() == "/health" {
                 let is_full = *health_check_is_full.lock().unwrap();

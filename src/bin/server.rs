@@ -9,9 +9,7 @@ fn main() {
 
     let health_listen_at = env::args()
         .nth(2)
-        .unwrap_or_else(|| "127.0.0.1:8081".to_string())
-        .parse::<u64>()
-        .unwrap();
+        .unwrap_or_else(|| "127.0.0.1:8081".to_string());
 
     let thread_count = env::args()
         .nth(3)
@@ -21,9 +19,9 @@ fn main() {
 
     let queue_size = env::args()
         .nth(4)
-        .unwrap_or_else(|| (2 * thread_count).to_string())
+        .unwrap_or_else(|| (thread_count).to_string())
         .parse::<usize>()
         .unwrap();
 
-    server::start_server(&server_listen_at, queue_size, thread_count);
+    server::start_server(&server_listen_at, health_listen_at, queue_size, thread_count);
 }
