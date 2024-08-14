@@ -87,6 +87,34 @@ impl EdgeDB {
             None
         })
     }
+
+    pub fn to_graphviz(&self) -> String {
+        let mut dot = String::new();
+        dot.push_str("digraph G {\n");
+
+        // Use a box layout for the nodes
+        dot.push_str("node [shape=box];\n");
+
+        for edge in self.edges.iter() {
+            // Shorten Ethereum addresses to the first 6 characters plus ellipsis
+            let from_short = format!("{}..", &edge.from.to_string()[..6]);
+            let to_short = format!("{}..", &edge.to.to_string()[..6]);
+            let token_short = format!("{}..", &edge.token.to_string()[..6]);
+
+            // Convert capacity to string
+            let capacity_str = edge.capacity.to_decimal_fraction();
+
+            dot.push_str(&format!(
+                "\"{}\" -> \"{}\" [label=\"{}\", weight=\"{}\"];\n",
+                from_short,
+                to_short,
+                token_short,
+                capacity_str
+            ));
+        }
+        dot.push_str("}\n");
+        dot
+    }
 }
 
 fn outgoing_index(edges: &[Edge]) -> HashMap<Address, Vec<usize>> {

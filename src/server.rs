@@ -1,5 +1,5 @@
 use crate::rpc::rpc_handler::handle_connection;
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::{self, TrySendError};
@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::{env, thread};
 use tiny_http::{Server, Response};
 use crate::safe_db::edge_db_dispenser::EdgeDbDispenser;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 struct ServerState {
     is_full: Mutex<bool>,
@@ -29,13 +30,19 @@ impl ServerState {
     }
 }
 
+fn generate_unique_id() -> u64 {
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_millis() as u64
+}
+
 fn spawn_worker_threads(
     threads: u64,
     protected_receiver: Arc<Mutex<mpsc::Receiver<TcpStream>>>,
     edge_db_dispenser: Arc<EdgeDbDispenser>,
     state: Arc<ServerState>,
 ) {
-    for _ in 0..threads {
+    for i in 0..threads {
         let rec = Arc::clone(&protected_receiver);
         let dispenser_clone = Arc::clone(&edge_db_dispenser);
         let state_clone = Arc::clone(&state);
@@ -43,22 +50,31 @@ fn spawn_worker_threads(
         let is_running_clone = Arc::clone(&is_running);
 
         let handle = thread::spawn(move || {
+            let thread_id = format!("Thread-{}", i);
+            debug!("{}: Started", thread_id);
+
             let result = std::panic::catch_unwind(|| {
                 while is_running_clone.load(Ordering::SeqCst) {
                     if let Ok(socket) = rec.lock().unwrap().recv() {
+                        let connection_id = generate_unique_id();
+                        debug!("{}: Received connection with ID {}", thread_id, connection_id);
+
                         *state_clone.pending_requests.lock().unwrap() -= 1;
                         if let Err(e) = handle_connection(&dispenser_clone, socket) {
-                            error!("Error handling connection: {}", e);
+                            error!("{}: Error handling connection {}: {}", thread_id, connection_id, e);
+                        } else {
+                            debug!("{}: Successfully handled connection {}", thread_id, connection_id);
                         }
                     }
                 }
             });
 
             if result.is_err() {
-                error!("Thread {:?} encountered an error and stopped.", thread::current().id());
+                error!("{}: Encountered an error and stopped.", thread_id);
             }
 
             is_running_clone.store(false, Ordering::SeqCst);
+            debug!("{}: Stopped", thread_id);
         });
 
         info!("Spawned thread: {:?}.", handle.thread().id());
@@ -102,21 +118,28 @@ fn health_check_server(health_listen_at: String, queue_size: usize, state: Arc<S
 fn main_server_loop(listener: TcpListener, sender: mpsc::SyncSender<TcpStream>, state: Arc<ServerState>) {
     loop {
         match listener.accept() {
-            Ok((socket, _)) => match sender.try_send(socket) {
-                Ok(()) => {
-                    *state.is_full.lock().unwrap() = false;
-                    *state.pending_requests.lock().unwrap() += 1;
-                }
-                Err(TrySendError::Full(mut socket)) => {
-                    *state.is_full.lock().unwrap() = true;
-                    if let Err(e) = socket.write_all(b"HTTP/1.1 503 Service Unavailable\r\n\r\n") {
-                        warn!("Failed to send 503 response: {}", e);
+            Ok((socket, _)) => {
+                let connection_id = generate_unique_id();
+                debug!("Main loop: Accepted connection with ID {}", connection_id);
+
+                match sender.try_send(socket) {
+                    Ok(()) => {
+                        *state.is_full.lock().unwrap() = false;
+                        *state.pending_requests.lock().unwrap() += 1;
+                        debug!("Main loop: Queued connection with ID {}", connection_id);
+                    }
+                    Err(TrySendError::Full(mut socket)) => {
+                        *state.is_full.lock().unwrap() = true;
+                        if let Err(e) = socket.write_all(b"HTTP/1.1 503 Service Unavailable\r\n\r\n") {
+                            warn!("Main loop: Failed to send 503 response for connection {}: {}", connection_id, e);
+                        }
+                        debug!("Main loop: Queue full, rejected connection with ID {}", connection_id);
+                    }
+                    Err(TrySendError::Disconnected(_)) => {
+                        panic!("Internal communication channel disconnected.");
                     }
                 }
-                Err(TrySendError::Disconnected(_)) => {
-                    panic!("Internal communication channel disconnected.");
-                }
-            },
+            }
             Err(e) => error!("Error accepting connection: {}", e),
         }
     }

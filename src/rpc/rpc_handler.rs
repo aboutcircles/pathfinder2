@@ -67,6 +67,20 @@ pub fn handle_connection(
                 ),
             }?;
         }
+        "get_graphviz" => {
+            let db = edge_dispenser.get_latest_version(); // Assume get_db() returns a reference to your DB instance
+            let gv = db.unwrap().edges.to_graphviz();
+            respond(&mut socket, request.id, Some(gv), None, &call_context)?;
+        }
+        _ => {
+            respond::<JsonValue>(
+                &mut socket,
+                request.id,
+                None,
+                Some((-32601, "Method not found".to_string())),
+                &call_context,
+            )?;
+        }
         _ => {
             respond::<JsonValue>(
                 &mut socket,

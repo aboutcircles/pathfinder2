@@ -9,39 +9,39 @@ use crate::types::{Address, Edge, U256};
 use std::collections::{HashMap, VecDeque};
 
 /**
- The following is a description of how the max flow algorithm is implemented in this codebase.
+The following is a description of how the max flow algorithm is implemented in this codebase.
 
- 1) Setting up the Graph:
- The network graph is initialized with the provided edges and capacities.
- Nodes represent addresses, and edges represent the available flow capacity between nodes.
+1) Setting up the Graph:
+The network graph is initialized with the provided edges and capacities.
+Nodes represent addresses, and edges represent the available flow capacity between nodes.
 
- 2) Finding Paths:
- The Ford-Fulkerson algorithm is applied to find augmenting paths.
- The algorithm starts at the source node and explores the network graph looking for paths to the sink node.
- The selection of which node to traverse next is performed in a breadth-first manner, prioritizing the ones with the highest remaining capacity.
- However, the actual method could in theory be any traversal method.
+2) Finding Paths:
+The Ford-Fulkerson algorithm is applied to find augmenting paths.
+The algorithm starts at the source node and explores the network graph looking for paths to the sink node.
+The selection of which node to traverse next is performed in a breadth-first manner, prioritizing the ones with the highest remaining capacity.
+However, the actual method could in theory be any traversal method.
 
- 3) Sending Flow:
- When an augmenting path is found (a path from the source to the sink with some unused capacity), the algorithm sends a flow along this path.
- The amount of flow sent equals the bottleneck capacity (the smallest capacity on the path).
- This flow is now part of the total flow from the source to the sink.
- It also adjusts the remaining capacities of the edges on this path accordingly.
- The algorithm maintains a data structure, used_edges, to keep track of these adjustments.
+3) Sending Flow:
+When an augmenting path is found (a path from the source to the sink with some unused capacity), the algorithm sends a flow along this path.
+The amount of flow sent equals the bottleneck capacity (the smallest capacity on the path).
+This flow is now part of the total flow from the source to the sink.
+It also adjusts the remaining capacities of the edges on this path accordingly.
+The algorithm maintains a data structure, used_edges, to keep track of these adjustments.
 
- 4) Maximizing Flow:
- The algorithm keeps track of the total flow sent from the source to the sink.
- It continues finding augmenting paths and sending flow along them until no more augmenting paths can be found.
- At this point, the total flow sent from the source to the sink is the maximum possible flow under the capacity constraints of the edges.
- This is the solution to the max-flow problem.
+4) Maximizing Flow:
+The algorithm keeps track of the total flow sent from the source to the sink.
+It continues finding augmenting paths and sending flow along them until no more augmenting paths can be found.
+At this point, the total flow sent from the source to the sink is the maximum possible flow under the capacity constraints of the edges.
+This is the solution to the max-flow problem.
 
- 5) Repeating the Process:
- The algorithm repeats the process of finding paths and sending flow until it is no longer able to find a path from the source to the sink.
- This implies that we've achieved the maximum flow possible in the network under the given conditions.
+5) Repeating the Process:
+The algorithm repeats the process of finding paths and sending flow until it is no longer able to find a path from the source to the sink.
+This implies that we've achieved the maximum flow possible in the network under the given conditions.
 
- 6) Flow Capacity Adjustments:
- The adjustments to the edge capacities are stored in the used_edges structure, allowing the tracking of how much flow has been sent along each edge in the network.
- This structure is used later in the computation to prune the flow if it exceeds the requested amount and to reduce transfers if they exceed a specified maximum number.
-*/
+6) Flow Capacity Adjustments:
+The adjustments to the edge capacities are stored in the used_edges structure, allowing the tracking of how much flow has been sent along each edge in the network.
+This structure is used later in the computation to prune the flow if it exceeds the requested amount and to reduce transfers if they exceed a specified maximum number.
+ */
 
 pub fn compute_flow(
     source: &Address,
@@ -61,7 +61,6 @@ pub fn compute_flow(
         &mut adjacencies,
         &mut used_edges,
         max_distance,
-        requested_flow
     );
     call_context.log_message(format!("Max flow: {}", flow.to_decimal()).as_str());
 
@@ -75,7 +74,7 @@ pub fn compute_flow(
             max_transfers.unwrap_or_default(),
             flow.to_decimal()
         )
-        .as_str(),
+            .as_str(),
     );
 
     let transfers = create_sorted_transfers(source, sink, flow, used_edges, call_context);
@@ -90,7 +89,6 @@ fn compute_max_flow(
     adjacencies: &mut Adjacencies,
     used_edges: &mut HashMap<Node, HashMap<Node, U256>>,
     max_distance: Option<u64>,
-    requested_flow: U256
 ) -> U256 {
     let mut flow = U256::default();
     loop {
@@ -99,9 +97,6 @@ fn compute_max_flow(
             break;
         }
         flow += new_flow;
-        if flow >= requested_flow {
-            break;
-        }
         for window in parents.windows(2) {
             if let [node, prev] = window {
                 adjacencies.adjust_capacity(prev, node, -new_flow);
@@ -158,7 +153,7 @@ fn reduce_transfers_if_needed(
                 "Capacity lost by transfer count reduction: {}",
                 lost.to_decimal_fraction()
             )
-            .as_str(),
+                .as_str(),
         );
         return flow - lost;
     }
